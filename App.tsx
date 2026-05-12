@@ -1,49 +1,21 @@
-
-import { useEffect } from 'react';
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
+import { useEffect } from "react";
 import RNBootSplash from 'react-native-bootsplash';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import { NavigationContainer } from "@react-navigation/native";
+import TabNavigator from "./src/navigation/TabNavigator";
+
+async function handleSplashScreen() {
+  await RNBootSplash.hide({ fade: true});
+}
+
 
 function App() {
-  const isDarkMode = useColorScheme() === 'dark';
-
-  useEffect(() => {
-    const init = async () => {
-      await RNBootSplash.hide({ fade: true });
-    };
-
-    init();
-  }, []);
+  useEffect(() => {handleSplashScreen()}, [])
 
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
-    </SafeAreaProvider>
+    <NavigationContainer>
+      <TabNavigator/>
+    </NavigationContainer>
   );
 }
 
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
-
-  return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
-
-export default App;
+export default App

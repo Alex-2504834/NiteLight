@@ -1,12 +1,8 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
 
+import { useEffect } from 'react';
 import { NewAppScreen } from '@react-native/new-app-screen';
 import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
+import RNBootSplash from 'react-native-bootsplash';
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
@@ -14,6 +10,14 @@ import {
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
+
+  useEffect(() => {
+    const init = async () => {
+      await RNBootSplash.hide({ fade: true });
+    };
+
+    init();
+  }, []);
 
   return (
     <SafeAreaProvider>

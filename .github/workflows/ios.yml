@@ -39,15 +39,19 @@ jobs:
           xcodebuild \
             -workspace NiteLight.xcworkspace \
             -scheme NiteLight \
-            -configuration Debug \
+            -configuration Release \
             -sdk iphoneos \
             -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            ENABLE_DEBUG_DYLIB=NO
 
       - name: Create IPA
         run: |
           mkdir Payload
-          cp -r ios/build/Build/Products/Debug-iphoneos/NiteLight.app Payload/
+
+          cp -r ios/build/Build/Products/Release-iphoneos/NiteLight.app Payload/
+
+          cd Payload/..
           zip -r NiteLight.ipa Payload
 
       - name: Upload IPA

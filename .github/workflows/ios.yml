@@ -40,12 +40,12 @@ jobs:
         run: |
           mkdir Payload
 
-          cp -r ios/build/Build/Products/Debug-iphoneos/MyApp.app Payload/
+          cp -r ios/build/Build/Products/Debug-iphoneos/nitelight.app Payload/
 
-          zip -r MyApp.ipa Payload
+          zip -r nitelight.ipa Payload
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: ios-ipa
-          path: MyApp.ipa
+          path: nitelight.ipa

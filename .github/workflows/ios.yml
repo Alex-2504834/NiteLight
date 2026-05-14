@@ -29,8 +29,8 @@ jobs:
           cd ios
 
           xcodebuild \
-            -workspace nitelight.xcworkspace \
-            -scheme nitelight \
+            -workspace NiteLight.xcworkspace \
+            -scheme NiteLight \
             -configuration Debug \
             -sdk iphoneos \
             -derivedDataPath build \
@@ -40,12 +40,12 @@ jobs:
         run: |
           mkdir Payload
 
-          cp -r ios/build/Build/Products/Debug-iphoneos/nitelight.app Payload/
+          cp -r ios/build/Build/Products/Debug-iphoneos/NiteLight.app Payload/
 
-          zip -r nitelight.ipa Payload
+          zip -r NiteLight.ipa Payload
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: ios-ipa
-          path: nitelight.ipa
+          path: NiteLight.ipa

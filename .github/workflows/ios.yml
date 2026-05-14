@@ -15,6 +15,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
       - name: Install JS dependencies
         run: npm install
@@ -23,6 +24,13 @@ jobs:
         run: |
           cd ios
           pod install
+
+      - name: Clean Xcode build
+        run: |
+          cd ios
+          xcodebuild clean \
+            -workspace NiteLight.xcworkspace \
+            -scheme NiteLight
 
       - name: Build iOS app
         run: |
@@ -39,9 +47,7 @@ jobs:
       - name: Create IPA
         run: |
           mkdir Payload
-
           cp -r ios/build/Build/Products/Debug-iphoneos/NiteLight.app Payload/
-
           zip -r NiteLight.ipa Payload
 
       - name: Upload IPA

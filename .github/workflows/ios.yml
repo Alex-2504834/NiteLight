@@ -29,8 +29,8 @@ jobs:
           cd ios
 
           xcodebuild \
-            -workspace MyApp.xcworkspace \
-            -scheme MyApp \
+            -workspace nitelight.xcworkspace \
+            -scheme nitelight \
             -configuration Debug \
             -sdk iphoneos \
             -derivedDataPath build \

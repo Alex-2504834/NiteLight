@@ -5,7 +5,7 @@ on:
 
 jobs:
   build-ios:
-    runs-on: macos-latest
+    runs-on: macos-15
 
     steps:
       - name: Checkout
@@ -14,24 +14,16 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: npm
 
-      - name: Install JS dependencies
+      - name: Install dependencies
         run: npm ci
 
       - name: Install CocoaPods
         working-directory: ios
         run: |
-          rm -rf Pods
-          rm -rf Podfile.lock
-
-          pod install --repo-update
-
-      - name: Clean build folders
-        run: |
-          rm -rf ios/build
-          rm -rf ~/Library/Developer/Xcode/DerivedData
+          pod install
 
       - name: Bundle React Native
         run: |
@@ -42,40 +34,24 @@ jobs:
             --bundle-output ios/main.jsbundle \
             --assets-dest ios
 
-      - name: Build app
+      - name: Build archive
         working-directory: ios
         run: |
-          set -o pipefail
-
-          xcodebuild \
+          xcodebuild archive \
             -workspace NiteLight.xcworkspace \
             -scheme NiteLight \
             -configuration Release \
-            -sdk iphoneos \
             -destination generic/platform=iOS \
-            -derivedDataPath build \
+            -archivePath build/NiteLight.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
-            ENABLE_BITCODE=NO \
-            | tee xcodebuild.log
-
-      - name: Upload Xcode log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: xcode-log
-          path: ios/xcodebuild.log
-
-      - name: Verify build output
-        run: |
-          find ios/build -name "*.app"
+            SKIP_INSTALL=NO
 
       - name: Create IPA
+        working-directory: ios
         run: |
           mkdir Payload
 
-          APP_PATH=$(find ios/build -name "NiteLight.app" | head -n 1)
-
-          cp -R "$APP_PATH" Payload/
+          cp -R build/NiteLight.xcarchive/Products/Applications/NiteLight.app Payload/
 
           zip -r NiteLight.ipa Payload
 
@@ -83,4 +59,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: NiteLight-IPA
-          path: NiteLight.ipa
+          path: ios/NiteLight.ipa

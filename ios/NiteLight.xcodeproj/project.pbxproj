@@ -45,14 +45,6 @@
 			path = AppDelegate.swift;
 			sourceTree = "<group>";
 		};
-			isa = PBXFileReference;
-			lastKnownFileType = file.storyboard;
-			sourceTree = "<group>";
-		};
-			isa = PBXFileReference;
-			lastKnownFileType = file.storyboard;
-			sourceTree = "<group>";
-		};
 		891662F5FEBE4AC0A7B9E01B /* Colors.xcassets */ = {
 			isa = PBXFileReference;
 			lastKnownFileType = folder.assetcatalog;

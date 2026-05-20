@@ -22,24 +22,59 @@ jobs:
 
       - name: Install CocoaPods
         working-directory: ios
-        run: pod install --repo-update
+        run: |
+          rm -rf Pods
+          rm -rf Podfile.lock
+
+          pod install --repo-update
+
+      - name: Clean build folders
+        run: |
+          rm -rf ios/build
+          rm -rf ~/Library/Developer/Xcode/DerivedData
+
+      - name: Bundle React Native
+        run: |
+          npx react-native bundle \
+            --platform ios \
+            --dev false \
+            --entry-file index.js \
+            --bundle-output ios/main.jsbundle \
+            --assets-dest ios
+
+      - name: Verify AppDelegate exists
+        run: |
+          ls -la ios
+          test -f ios/AppDelegate.swift
 
       - name: Build app
         working-directory: ios
         run: |
+          xcodebuild clean \
+            -workspace NiteLight.xcworkspace \
+            -scheme NiteLight
+
           xcodebuild \
             -workspace NiteLight.xcworkspace \
             -scheme NiteLight \
             -configuration Release \
             -sdk iphoneos \
+            -destination generic/platform=iOS \
             -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            ENABLE_BITCODE=NO
+
+      - name: Verify build output
+        run: |
+          find ios/build -name "*.app"
 
       - name: Create IPA
         run: |
           mkdir Payload
 
-          cp -r ios/build/Build/Products/Release-iphoneos/NiteLight.app Payload/
+          APP_PATH=$(find ios/build -name "NiteLight.app" | head -n 1)
+
+          cp -R "$APP_PATH" Payload/
 
           zip -r NiteLight.ipa Payload
 

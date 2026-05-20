@@ -42,21 +42,10 @@ jobs:
             --bundle-output ios/main.jsbundle \
             --assets-dest ios
 
-      - name: Verify iOS files
-        run: |
-          ls -la ios
-          ls -la ios/NiteLight
-
-          test -f ios/NiteLight/AppDelegate.swift
-          test -d ios/NiteLight/Images.xcassets
-          test -d ios/NiteLight/Colors.xcassets
-
       - name: Build app
         working-directory: ios
         run: |
-          xcodebuild clean \
-            -workspace NiteLight.xcworkspace \
-            -scheme NiteLight
+          set -o pipefail
 
           xcodebuild \
             -workspace NiteLight.xcworkspace \
@@ -66,7 +55,15 @@ jobs:
             -destination generic/platform=iOS \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
-            ENABLE_BITCODE=NO
+            ENABLE_BITCODE=NO \
+            | tee xcodebuild.log
+
+      - name: Upload Xcode log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcode-log
+          path: ios/xcodebuild.log
 
       - name: Verify build output
         run: |

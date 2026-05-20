@@ -42,10 +42,14 @@ jobs:
             --bundle-output ios/main.jsbundle \
             --assets-dest ios
 
-      - name: Verify AppDelegate exists
+      - name: Verify iOS files
         run: |
           ls -la ios
-          test -f ios/AppDelegate.swift
+          ls -la ios/NiteLight
+
+          test -f ios/NiteLight/AppDelegate.swift
+          test -d ios/NiteLight/Images.xcassets
+          test -d ios/NiteLight/Colors.xcassets
 
       - name: Build app
         working-directory: ios

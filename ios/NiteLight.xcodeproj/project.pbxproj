@@ -24,7 +24,7 @@
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {
 			isa = PBXFileReference;
 			lastKnownFileType = folder.assetcatalog;
-			path = Images.xcassets;
+			path = NiteLight/Images.xcassets;
 			sourceTree = "<group>";
 		};
 		13B07FB61A68108700A75B9A /* Info.plist */ = {
@@ -42,13 +42,13 @@
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.swift;
-			path = AppDelegate.swift;
+			path = NiteLight/AppDelegate.swift;
 			sourceTree = "<group>";
 		};
 		891662F5FEBE4AC0A7B9E01B /* Colors.xcassets */ = {
 			isa = PBXFileReference;
 			lastKnownFileType = folder.assetcatalog;
-			path = Colors.xcassets;
+			path = NiteLight/Colors.xcassets;
 			sourceTree = "<group>";
 		};
 		3B4392A12AC88292D35C810B /* Pods-NiteLight.debug.xcconfig */ = {

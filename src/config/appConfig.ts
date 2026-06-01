@@ -14,4 +14,5 @@ export const appConfig = {
   apiBaseUrl: requiredConfigValue("API_BASE_URL").replace(/\/$/, ""),
   googleWebClientId: requiredConfigValue("GOOGLE_WEB_CLIENT_ID"),
   mapboxAccessToken: requiredConfigValue("MAPBOX_ACCESS_TOKEN"),
+  stripePublishableKey: requiredConfigValue("STRIPE_PUBLISHABLE_KEY"),
 };

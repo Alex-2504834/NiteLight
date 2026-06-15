@@ -1,9 +1,10 @@
 import { Dispatch, SetStateAction } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Text, TouchableOpacity, View } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 
 import { signInWithGoogle } from "../../services/auth";
-import { useTheme } from "../../theme/useTheme";
+import { authStyles } from "../../styles/global";
+import { useTheme } from "../../styles/useTheme";
 import { AuthActionRunner, FieldErrors } from "./authTypes";
 import ActionButton from "./components/ActionButton";
 
@@ -27,19 +28,19 @@ export default function PlatformsScreen({
   }
 
   return (
-    <View style={styles.formStack}>
+    <View style={authStyles.formStack}>
       <TouchableOpacity
         activeOpacity={0.75}
         onPress={onBackToChoice}
-        style={styles.topBackButton}
+        style={authStyles.topBackButton}
       >
         <Ionicons name="chevron-back" size={22} color={colour.textSecondary} />
-        <Text style={[styles.backButtonText, { color: colour.textSecondary }]}>Back</Text>
+        <Text style={[authStyles.backButtonText, { color: colour.textSecondary }]}>Back</Text>
       </TouchableOpacity>
 
-      <Text style={[styles.formTitle, { color: colour.text }]}>Continue with another platform</Text>
+      <Text style={[authStyles.formTitle, { color: colour.text }]}>Continue with another platform</Text>
 
-      <Text style={[styles.formSubtitle, { color: colour.textSecondary }]}>Choose a provider to continue into NiteLight.</Text>
+      <Text style={[authStyles.formSubtitle, { color: colour.textSecondary }]}>Choose a provider to continue into NiteLight.</Text>
 
       <ActionButton
         icon="logo-google"
@@ -73,11 +74,3 @@ export default function PlatformsScreen({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  formStack: { gap: 14 },
-  topBackButton: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", marginBottom: 18 },
-  backButtonText: { fontSize: 15, fontWeight: "700" },
-  formTitle: { fontSize: 28, fontWeight: "800" },
-  formSubtitle: { marginTop: 6, fontSize: 15, lineHeight: 21 },
-});

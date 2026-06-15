@@ -22,6 +22,8 @@ export type NiteLightPlace = {
   type: string;
   placeId?: string | null;
   address?: string;
+  imageUrl?: string | null;
+  photoUrl?: string | null;
   coord: {
     latitude: number;
     longitude: number;

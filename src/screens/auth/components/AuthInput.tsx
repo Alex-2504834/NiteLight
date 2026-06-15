@@ -1,7 +1,8 @@
 import { ComponentProps } from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import { Text, TextInput, View } from "react-native";
 
-import { useTheme } from "../../../theme/useTheme";
+import { authStyles } from "../../../styles/global";
+import { useTheme } from "../../../styles/useTheme";
 
 type AuthInputProps = ComponentProps<typeof TextInput> & {
   label: string;
@@ -19,12 +20,12 @@ export default function AuthInput({
   ...props
 }: AuthInputProps) {
   return (
-    <View style={styles.inputGroup}>
-      <Text style={[styles.inputLabel, { color: colour.textSecondary }]}>{label}</Text>
+    <View style={authStyles.inputGroup}>
+      <Text style={[authStyles.inputLabel, { color: colour.textSecondary }]}>{label}</Text>
       <TextInput
         placeholderTextColor={colour.textSecondary}
         style={[
-          styles.input,
+          authStyles.input,
           {
             backgroundColor: colour.surface,
             borderColor: error ? colour.error : colour.border,
@@ -35,18 +36,10 @@ export default function AuthInput({
         {...props}
       />
       {error ? (
-        <Text style={[styles.fieldError, { color: colour.error }]}>{error}</Text>
+        <Text style={[authStyles.fieldError, { color: colour.error }]}>{error}</Text>
       ) : helperText ? (
-        <Text style={[styles.helperText, { color: colour.textSecondary }]}>{helperText}</Text>
+        <Text style={[authStyles.helperText, { color: colour.textSecondary }]}>{helperText}</Text>
       ) : null}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  inputGroup: { gap: 7 },
-  inputLabel: { fontSize: 13, fontWeight: "700" },
-  input: { minHeight: 52, borderRadius: 999, borderWidth: 1, paddingHorizontal: 18, fontSize: 16 },
-  helperText: { fontSize: 12, lineHeight: 17 },
-  fieldError: { fontSize: 12, lineHeight: 17, fontWeight: "700" },
-});

@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "417965173652",
+    "project_id": "nitelightcic-85b75",
+    "storage_bucket": "nitelightcic-85b75.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:417965173652:android:a19713c2589a9f827a3d81",
+        "android_client_info": {
+          "package_name": "com.nitelight"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "417965173652-fcvmp4rj4rlofufgng7acpgqpqgmc3bn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nitelight",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "417965173652-8bchgo0uae5bm7aao1b2vud6ger0d942.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDDOj43YGPH58wvz4DZWNYPwM-AqjHNi5M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "417965173652-8bchgo0uae5bm7aao1b2vud6ger0d942.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

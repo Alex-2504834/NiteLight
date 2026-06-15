@@ -1,6 +1,9 @@
 import { ComponentProps } from "react";
-import { StyleSheet, Text, TouchableOpacity } from "react-native";
+import { Text, TouchableOpacity } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
+
+import { authStyles } from "../../../styles/global";
+import { opacity } from "../../../styles/theme";
 
 type ActionButtonProps = {
   icon: ComponentProps<typeof Ionicons>["name"];
@@ -27,32 +30,16 @@ export default function ActionButton({
       disabled={disabled}
       onPress={onPress}
       style={[
-        styles.actionButton, {
+        authStyles.actionButton,
+        {
           backgroundColor,
           borderColor: borderColor || backgroundColor,
-          opacity: disabled ? 0.6 : 1,
+          opacity: disabled ? opacity.disabled : 1,
         },
-      ]}>
-        
+      ]}
+    >
       <Ionicons name={icon} size={20} color={textColor} />
-      <Text style={[styles.actionButtonText, { color: textColor }]}>{label}</Text>
+      <Text style={[authStyles.actionButtonText, { color: textColor }]}>{label}</Text>
     </TouchableOpacity>
   );
 }
-
-const styles = StyleSheet.create({
-  actionButton: {
-    minHeight: 54,
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-  },
-  actionButtonText: {
-    fontSize: 16,
-    fontWeight: "800",
-  },
-});

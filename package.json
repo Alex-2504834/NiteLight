@@ -4,10 +4,13 @@
   "private": true,
   "scripts": {
     "android": "react-native run-android",
+    "setup:env": "node scripts/setup-env.mjs",
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
-    "test": "jest"
+    "test": "jest",
+    "doctor": "powershell -ExecutionPolicy Bypass -File scripts/check-dev-env.ps1 -NoInstall",
+    "doctor:fix": "powershell -ExecutionPolicy Bypass -File scripts/check-dev-env.ps1 -Install"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",

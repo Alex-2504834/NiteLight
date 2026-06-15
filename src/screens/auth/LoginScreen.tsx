@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Text, TouchableOpacity, View } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 
 import { loginWithIdentifier } from "../../services/auth";
-import { useTheme } from "../../theme/useTheme";
+import { authStyles } from "../../styles/global";
+import { colors } from "../../styles/theme";
+import { useTheme } from "../../styles/useTheme";
 import { AuthActionRunner, FieldErrors } from "./authTypes";
 import ActionButton from "./components/ActionButton";
 import AuthInput from "./components/AuthInput";
@@ -52,17 +54,17 @@ export default function LoginScreen({
   }
 
   return (
-    <View style={styles.formStack}>
+    <View style={authStyles.formStack}>
       <TouchableOpacity
         activeOpacity={0.75}
         onPress={onBackToChoice}
-        style={styles.topBackButton}
+        style={authStyles.topBackButton}
       >
         <Ionicons name="chevron-back" size={22} color={colour.textSecondary} />
-        <Text style={[styles.backButtonText, { color: colour.textSecondary }]}>Back</Text>
+        <Text style={[authStyles.backButtonText, { color: colour.textSecondary }]}>Back</Text>
       </TouchableOpacity>
 
-      <Text style={[styles.formTitle, { color: colour.text }]}>Welcome back</Text>
+      <Text style={[authStyles.formTitle, { color: colour.text }]}>Welcome back</Text>
 
       <AuthInput
         label="Email, phone, or username"
@@ -96,16 +98,9 @@ export default function LoginScreen({
         label="Log in"
         onPress={handleLogin}
         backgroundColor={colour.primary}
-        textColor="#1F2122"
+        textColor={colors.brandText}
         disabled={isLoading}
       />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  formStack: { gap: 14 },
-  topBackButton: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", marginBottom: 18 },
-  backButtonText: { fontSize: 15, fontWeight: "700" },
-  formTitle: { fontSize: 28, fontWeight: "800" },
-});

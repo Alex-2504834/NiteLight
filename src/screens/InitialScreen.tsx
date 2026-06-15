@@ -5,14 +5,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 
 import { continueAsGuest } from "../services/auth";
-import { useTheme } from "../theme/useTheme";
+import { authStyles } from "../styles/global";
+import { colors } from "../styles/theme";
+import { useTheme } from "../styles/useTheme";
 import { AuthMode, FieldErrors } from "./auth/authTypes";
 import ActionButton from "./auth/components/ActionButton";
 import LoginScreen from "./auth/LoginScreen";
@@ -111,45 +112,45 @@ export default function InitialScreen({ onComplete }: InitialScreenProps) {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={[styles.screen, { backgroundColor: colour.background }]}
+      style={[authStyles.screen, { backgroundColor: colour.background }]}
     >
       <ScrollView
         contentContainerStyle={[
-          styles.content,
-          isChoiceMode && styles.choiceContent,
-          isSignUpMode && styles.signUpContent,
-          (isLoginMode || isPlatformsMode) && styles.upperContent,
+          authStyles.content,
+          isChoiceMode && authStyles.choiceContent,
+          isSignUpMode && authStyles.signUpContent,
+          (isLoginMode || isPlatformsMode) && authStyles.upperContent,
         ]}
         keyboardShouldPersistTaps="handled"
       >
         {showBrand && (
           <Animated.View
             style={[
-              styles.brandLockup,
+              authStyles.brandLockup,
               {
                 transform: [{ scale: logoScale }],
                 opacity: isChoiceMode ? choiceOpacity : 1,
               },
             ]}
           >
-            <View style={[styles.logoMark, { backgroundColor: colour.primary }]}>
-              <Ionicons name="bulb-outline" size={34} color="#1F2122" />
+            <View style={[authStyles.logoMark, { backgroundColor: colour.primary }]}>
+              <Ionicons name="bulb-outline" size={34} color={colors.brandText} />
             </View>
 
-            <Text style={[styles.appName, { color: colour.text }]}>NiteLight</Text>
+            <Text style={[authStyles.appName, { color: colour.text }]}>NiteLight</Text>
 
-            <Text style={[styles.subtitle, { color: colour.textSecondary }]}>Place Holder Text.</Text>
+            <Text style={[authStyles.subtitle, { color: colour.textSecondary }]}>Place Holder Text.</Text>
           </Animated.View>
         )}
 
         {isChoiceMode && (
-          <Animated.View style={[styles.choiceStack, { opacity: choiceOpacity }]}>
+          <Animated.View style={[authStyles.choiceStack, { opacity: choiceOpacity }]}>
             <ActionButton
               icon="person-add-outline"
               label="Sign up"
               onPress={openSignUp}
               backgroundColor={colour.primary}
-              textColor="#1F2122"
+              textColor={colors.brandText}
               disabled={isLoading}
             />
 
@@ -211,35 +212,19 @@ export default function InitialScreen({ onComplete }: InitialScreenProps) {
         )}
 
         {errors.general && (
-          <Text style={[styles.generalError, { color: colour.error }]}>{errors.general}</Text>
+          <Text style={[authStyles.generalError, { color: colour.error }]}>{errors.general}</Text>
         )}
 
         {isLoading && (
-          <View style={styles.loadingOverlay}>
+          <View style={authStyles.loadingOverlay}>
             <ActivityIndicator color={colour.primary} />
           </View>
         )}
 
         {(isSignUpMode || isLoginMode || isPlatformsMode) && (
-          <Text style={[styles.securityNote, { color: colour.textSecondary }]}>Passwords are handled securely</Text>
+          <Text style={[authStyles.securityNote, { color: colour.textSecondary }]}>Passwords are handled securely</Text>
         )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  content: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 24 },
-  choiceContent: { justifyContent: "center", paddingTop: 24 },
-  upperContent: { justifyContent: "flex-start", paddingTop: 64 },
-  signUpContent: { justifyContent: "flex-start", paddingTop: 64 },
-  brandLockup: { alignItems: "center", marginBottom: 26 },
-  logoMark: { width: 68, height: 68, borderRadius: 999, alignItems: "center", justifyContent: "center", marginBottom: 18 },
-  appName: { fontSize: 34, fontWeight: "800" },
-  subtitle: { marginTop: 8, fontSize: 16, lineHeight: 22, textAlign: "center" },
-  choiceStack: { gap: 12 },
-  generalError: { marginTop: 14, fontSize: 13, lineHeight: 18, fontWeight: "700", textAlign: "center" },
-  securityNote: { marginTop: 20, fontSize: 12, lineHeight: 17, textAlign: "center" },
-  loadingOverlay: { marginTop: 16, alignItems: "center" },
-});

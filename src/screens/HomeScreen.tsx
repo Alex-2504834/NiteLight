@@ -4,8 +4,9 @@ import { useStripe } from "@stripe/stripe-react-native";
 
 import { seedPlaces } from "../dev/seedPlaces";
 import { createTestPaymentSheet } from "../services/payments";
-import { globalStyles } from "../theme/styles";
-import { useTheme } from "../theme/useTheme";
+import { globalStyles, homeStyles } from "../styles/global";
+import { opacity } from "../styles/theme";
+import { useTheme } from "../styles/useTheme";
 
 export default function HomeScreen() {
   const { colour } = useTheme();
@@ -59,39 +60,32 @@ export default function HomeScreen() {
     }
   }
 
-  const buttonStyle = {
-    marginTop: 20,
-    backgroundColor: colour.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 999,
-    minWidth: 180,
-    alignItems: "center" as const,
-  };
-
   return (
     <View style={[globalStyles.screen, { backgroundColor: colour.background }]}>
-      <Text style={[globalStyles.title, { color: colour.text }]}>
-        Home Screen
-      </Text>
+      <Text style={[globalStyles.title, { color: colour.text }]}>Home Screen</Text>
 
-      <TouchableOpacity onPress={handleSeedPlaces} style={buttonStyle}>
-        <Text style={{ color: "#1F2122", fontWeight: "700" }}>
-          Seed places
-        </Text>
+      <TouchableOpacity
+        onPress={handleSeedPlaces}
+        style={[homeStyles.primaryButton, { backgroundColor: colour.primary }]}
+      >
+        <Text style={homeStyles.primaryButtonText}>Seed places</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
         disabled={isPaymentLoading}
         onPress={handleTestPayment}
-        style={[buttonStyle, { opacity: isPaymentLoading ? 0.6 : 1 }]}
+        style={[
+          homeStyles.primaryButton,
+          {
+            backgroundColor: colour.primary,
+            opacity: isPaymentLoading ? opacity.disabled : 1,
+          },
+        ]}
       >
         {isPaymentLoading ? (
           <ActivityIndicator />
         ) : (
-          <Text style={{ color: "#1F2122", fontWeight: "700" }}>
-            Test Stripe payment
-          </Text>
+          <Text style={homeStyles.primaryButtonText}>Test Stripe payment</Text>
         )}
       </TouchableOpacity>
     </View>

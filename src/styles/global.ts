@@ -348,11 +348,6 @@ export const mapStyles = StyleSheet.create({
     opacity: 0.92,
   },
 
-  placeInfoImagePlaceholderIcon: {
-    fontSize: 28,
-    fontWeight: "800",
-  },
-
   placeInfoImagePlaceholderText: {
     ...typography.helper,
     fontWeight: "700",

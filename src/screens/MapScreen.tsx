@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -186,35 +186,29 @@ export default function MapScreen() {
   const [showRecenterButton, setShowRecenterButton] = useState(false);
   const [isRecenterCollapsed, setIsRecenterCollapsed] = useState(false);
 
-  const placeSheetPanResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gesture) =>
-          Math.abs(gesture.dy) > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
-        onPanResponderGrant: () => {
-          placeSheetDragY.setValue(0);
-        },
-        onPanResponderMove: (_, gesture) => {
-          const minDragY = isPlaceSheetExpanded
-            ? 0
-            : -collapsedPlaceSheetTranslateY;
-          const maxDragY = isPlaceSheetExpanded
-            ? expandedPlaceSheetHeight
-            : 180;
+  const placeSheetPanResponder = PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gesture) =>
+      Math.abs(gesture.dy) > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+    onPanResponderGrant: () => {
+      placeSheetDragY.setValue(0);
+    },
+    onPanResponderMove: (_, gesture) => {
+      const minDragY = isPlaceSheetExpanded
+        ? 0
+        : -collapsedPlaceSheetTranslateY;
+      const maxDragY = isPlaceSheetExpanded ? expandedPlaceSheetHeight : 180;
 
-          placeSheetDragY.setValue(
-            Math.max(minDragY, Math.min(maxDragY, gesture.dy))
-          );
-        },
-        onPanResponderRelease: (_, gesture) => {
-          finishPlaceSheetDrag(gesture);
-        },
-        onPanResponderTerminate: () => {
-          resetPlaceSheetDrag();
-        },
-      }),
-    [isPlaceSheetExpanded, expandedPlaceSheetHeight, collapsedPlaceSheetTranslateY]
-  );
+      placeSheetDragY.setValue(
+        Math.max(minDragY, Math.min(maxDragY, gesture.dy))
+      );
+    },
+    onPanResponderRelease: (_, gesture) => {
+      finishPlaceSheetDrag(gesture);
+    },
+    onPanResponderTerminate: () => {
+      resetPlaceSheetDrag();
+    },
+  });
 
   useEffect(() => {
     const unsubscribe = listenToPlaces(
@@ -643,9 +637,6 @@ export default function MapScreen() {
               />
             </View>
 
-            <Text style={[mapStyles.placeInfoImagePlaceholderIcon, { color: colour.primary }]}>
-              ✦
-            </Text>
             <Text style={[mapStyles.placeInfoImagePlaceholderText, { color: colour.textSecondary }]}>
               {isPlaceDetailsLoading ? "Loading image preview" : "No image preview yet"}
             </Text>

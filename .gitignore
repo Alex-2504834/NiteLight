@@ -32,3 +32,5 @@ ios/build/
 .DS_Store
 .vscode/
 .idea/
+android/local.properties
+rnconfig.json

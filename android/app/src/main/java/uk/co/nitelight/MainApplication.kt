@@ -1,4 +1,4 @@
-package com.nitelight
+package uk.co.nitelight
 
 import android.app.Application
 import com.facebook.react.PackageList

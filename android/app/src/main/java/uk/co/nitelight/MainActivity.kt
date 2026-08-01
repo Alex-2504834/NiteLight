@@ -1,4 +1,4 @@
-package com.nitelight
+package uk.co.nitelight
 
 import android.os.Bundle
 import com.facebook.react.ReactActivity

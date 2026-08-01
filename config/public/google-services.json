@@ -7,17 +7,17 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:417965173652:android:a19713c2589a9f827a3d81",
+        "mobilesdk_app_id": "1:417965173652:android:1601acbccfa1f87f7a3d81",
         "android_client_info": {
-          "package_name": "com.nitelight"
+          "package_name": "uk.co.nitelight"
         }
       },
       "oauth_client": [
         {
-          "client_id": "417965173652-fcvmp4rj4rlofufgng7acpgqpqgmc3bn.apps.googleusercontent.com",
+          "client_id": "417965173652-cpuvjs5csevri4uas19nahv3n612prjn.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.nitelight",
+            "package_name": "uk.co.nitelight",
             "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
           }
         },

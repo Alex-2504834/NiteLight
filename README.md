@@ -1,5 +1,9 @@
 # NiteLight
 
+NiteLight is a React Native companion app for Nite Light CIC. It helps people
+find nearby food, clothing, hygiene essentials, community facilities and
+practical support from charities and local organisations across the Tees Valley.
+
 ## Windows setup
 
 This project includes a Windows PowerShell checker for the Android dev environment.

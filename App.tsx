@@ -3,16 +3,22 @@ import auth, { FirebaseAuthTypes } from "@react-native-firebase/auth";
 import RNBootSplash from "react-native-bootsplash";
 import { NavigationContainer } from "@react-navigation/native";
 import { StripeProvider } from "@stripe/stripe-react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import TabNavigator from "./src/navigation/TabNavigator";
 import InitialScreen from "./src/screens/InitialScreen";
 import { appConfig } from "./src/config/appConfig";
+import {
+  AppPreferencesProvider,
+  useAppPreferences,
+} from "./src/settings/AppPreferencesContext";
 
 async function handleSplashScreen() {
   await RNBootSplash.hide({ fade: true });
 }
 
-function App() {
+function AppContent() {
+  const { isReady: arePreferencesReady } = useAppPreferences();
   const [hasResolvedInitialRoute, setHasResolvedInitialRoute] = useState(false);
   const [canEnterApp, setCanEnterApp] = useState(false);
 
@@ -21,18 +27,23 @@ function App() {
       (user: FirebaseAuthTypes.User | null) => {
         setCanEnterApp(Boolean(user));
         setHasResolvedInitialRoute(true);
-        handleSplashScreen();
       }
     );
 
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    if (hasResolvedInitialRoute && arePreferencesReady) {
+      handleSplashScreen();
+    }
+  }, [arePreferencesReady, hasResolvedInitialRoute]);
+
   function handleInitialFlowComplete() {
     setCanEnterApp(true);
   }
 
-  if (!hasResolvedInitialRoute) {
+  if (!hasResolvedInitialRoute || !arePreferencesReady) {
     return null;
   }
 
@@ -46,6 +57,16 @@ function App() {
         )}
       </NavigationContainer>
     </StripeProvider>
+  );
+}
+
+function App() {
+  return (
+    <SafeAreaProvider>
+      <AppPreferencesProvider>
+        <AppContent />
+      </AppPreferencesProvider>
+    </SafeAreaProvider>
   );
 }
 

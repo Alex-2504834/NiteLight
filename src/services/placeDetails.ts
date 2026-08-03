@@ -2,6 +2,11 @@ import { Image } from "react-native";
 
 import { apiFetch } from "./api";
 
+export type PlacePhoto = {
+  uri: string;
+  attributions?: string[];
+};
+
 export type PlaceDetails = {
   id: string;
   name?: string;
@@ -18,6 +23,7 @@ export type PlaceDetails = {
   weekdayDescriptions?: string[];
   photoUri?: string;
   photoAttributions?: string[];
+  photos?: PlacePhoto[];
 };
 
 type CachedPlaceDetails = {
@@ -42,13 +48,79 @@ function getCachedPlaceDetails(placeId: string) {
   return cached.details;
 }
 
+function normalisePhotoAttributions(value: unknown) {
+  if (!Array.isArray(value)) return undefined;
+
+  const attributions = value
+    .map(item => {
+      if (typeof item === "string") return item;
+      if (typeof item === "object" && item !== null) {
+        if ("displayName" in item && typeof item.displayName === "string") {
+          return item.displayName;
+        }
+        if ("text" in item && typeof item.text === "string") return item.text;
+      }
+      return null;
+    })
+    .filter((item): item is string => Boolean(item));
+
+  return attributions.length ? attributions : undefined;
+}
+
+function normalisePlaceDetails(rawDetails: PlaceDetails & Record<string, unknown>): PlaceDetails {
+  const rawPhotos = Array.isArray(rawDetails.photos)
+    ? rawDetails.photos
+    : Array.isArray(rawDetails.photoUris)
+    ? rawDetails.photoUris
+    : [];
+
+  const photos = rawPhotos
+    .map<PlacePhoto | null>(photo => {
+      if (typeof photo === "string") return { uri: photo };
+      if (typeof photo !== "object" || photo === null) return null;
+
+      const candidate = photo as Record<string, unknown>;
+      const uri = [candidate.uri, candidate.photoUri, candidate.url]
+        .find(value => typeof value === "string");
+
+      if (typeof uri !== "string") return null;
+
+      return {
+        uri,
+        attributions: normalisePhotoAttributions(
+          candidate.attributions ?? candidate.authorAttributions
+        ),
+      };
+    })
+    .filter((photo): photo is PlacePhoto => Boolean(photo));
+
+  if (rawDetails.photoUri && !photos.some(photo => photo.uri === rawDetails.photoUri)) {
+    photos.unshift({
+      uri: rawDetails.photoUri,
+      attributions: rawDetails.photoAttributions,
+    });
+  }
+
+  return {
+    ...rawDetails,
+    photos,
+    photoUri: rawDetails.photoUri ?? photos[0]?.uri,
+    photoAttributions:
+      rawDetails.photoAttributions ?? photos[0]?.attributions,
+  };
+}
+
 function cachePlaceDetails(placeId: string, details: PlaceDetails) {
   placeDetailsCache.set(placeId, {
     details,
     expiresAt: Date.now() + PLACE_DETAILS_CACHE_MS,
   });
 
-  if (details.photoUri) {
+  details.photos?.slice(0, 4).forEach(photo => {
+    Image.prefetch(photo.uri).catch(() => undefined);
+  });
+
+  if (!details.photos?.length && details.photoUri) {
     Image.prefetch(details.photoUri).catch(() => undefined);
   }
 }
@@ -69,7 +141,8 @@ export async function getGooglePlaceDetails(placeId: string) {
   const encodedPlaceId = encodeURIComponent(placeId);
   const request = (apiFetch(`/places/google-details/${encodedPlaceId}`, {
     requireAuth: false,
-  }) as Promise<PlaceDetails>).then(details => {
+  }) as Promise<PlaceDetails & Record<string, unknown>>).then(rawDetails => {
+    const details = normalisePlaceDetails(rawDetails);
     cachePlaceDetails(placeId, details);
     return details;
   });
@@ -81,4 +154,9 @@ export async function getGooglePlaceDetails(placeId: string) {
   } finally {
     pendingPlaceDetailRequests.delete(placeId);
   }
+}
+
+export function clearPlaceDetailsCache() {
+  placeDetailsCache.clear();
+  pendingPlaceDetailRequests.clear();
 }

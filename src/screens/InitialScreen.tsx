@@ -138,8 +138,11 @@ export default function InitialScreen({ onComplete }: InitialScreenProps) {
             </View>
 
             <Text style={[authStyles.appName, { color: colour.text }]}>NiteLight</Text>
+            <View
+              style={[authStyles.brandRule, { backgroundColor: colour.primary }]}
+            />
 
-            <Text style={[authStyles.subtitle, { color: colour.textSecondary }]}>Place Holder Text.</Text>
+            <Text style={[authStyles.subtitle, { color: colour.textSecondary }]}>Find nearby food, essentials and support services.</Text>
           </Animated.View>
         )}
 

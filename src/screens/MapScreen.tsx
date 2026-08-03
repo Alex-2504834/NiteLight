@@ -3,23 +3,30 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Easing,
+  FlatList,
   Image,
+  LayoutAnimation,
   Linking,
+  Modal,
   PanResponder,
   ScrollView,
   PermissionsAndroid,
   Platform,
   Text,
   TouchableOpacity,
+  UIManager,
   useWindowDimensions,
   View,
 } from "react-native";
 import type { PanResponderGestureState } from "react-native";
 import Mapbox, { Camera, Location } from "@rnmapbox/maps";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Ionicons from "react-native-vector-icons/Ionicons";
 
 import { appConfig } from "../config/appConfig";
+import { useAppPreferences } from "../settings/AppPreferencesContext";
 import { mapStyles } from "../styles/global";
-import { sizes, spacing } from "../styles/theme";
 import { useTheme } from "../styles/useTheme";
 import { listenToPlaces, NiteLightPlace } from "../services/places";
 import {
@@ -32,6 +39,13 @@ import { getPlaceBrightness } from "../utils/placeStatus";
 Mapbox.setAccessToken(appConfig.mapboxAccessToken);
 
 type Coordinate = [number, number];
+type PlaceSheetSnap = "collapsed" | "expanded" | "dragging" | "closed";
+
+const PLACE_SHEET_HANDLE_HEIGHT = 26;
+const PLACE_SHEET_TOP_GAP = 18;
+const PLACE_SHEET_CLOSE_GAP = 64;
+const PLACE_SHEET_MIN_COLLAPSED_HEIGHT = 430;
+const PLACE_SHEET_PREVIEW_BODY_HEIGHT = 250;
 
 const placeStatusLabels = {
   open: "Open now",
@@ -73,12 +87,24 @@ function getSavedOpeningHourDescriptions(
   });
 }
 
-function formatPlaceType(type: string) {
-  if (!type) return "Place";
+const serviceTypeLabels: Record<string, string> = {
+  support: "Support & advice",
+  food: "Food & essentials",
+  clothes: "Clothing & hygiene",
+  utilities: "Community facilities",
+};
 
-  return type
-    .replace(/[-_]/g, " ")
-    .replace(/\b\w/g, character => character.toUpperCase());
+function formatPlaceType(type: string) {
+  if (!type) return "Support service";
+
+  const normalisedType = type.trim().toLowerCase();
+
+  return (
+    serviceTypeLabels[normalisedType] ??
+    type
+      .replace(/[-_]/g, " ")
+      .replace(/\b\w/g, character => character.toUpperCase())
+  );
 }
 
 function formatBusinessStatus(status?: string) {
@@ -144,26 +170,75 @@ function getMapsUrl(place: NiteLightPlace, details: PlaceDetails | null) {
 
 export default function MapScreen() {
   const { colour } = useTheme();
-  const { height: windowHeight } = useWindowDimensions();
+  const { centreOnLocation } = useAppPreferences();
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
+  const [mapViewportHeight, setMapViewportHeight] = useState(windowHeight);
+  const placeSheetTopInset = Math.max(PLACE_SHEET_TOP_GAP, insets.top + 6);
   const expandedPlaceSheetHeight = Math.max(
-    sizes.placeInfoSheetOffset,
-    windowHeight - 44
+    420,
+    mapViewportHeight - placeSheetTopInset
+  );
+  const placeInfoImageHeight = Math.max(
+    180,
+    Math.min(230, Math.round(expandedPlaceSheetHeight * 0.24))
+  );
+  const collapsedPlaceSheetHeight = Math.min(
+    expandedPlaceSheetHeight - 96,
+    Math.max(
+      PLACE_SHEET_MIN_COLLAPSED_HEIGHT,
+      placeInfoImageHeight +
+        PLACE_SHEET_HANDLE_HEIGHT +
+        PLACE_SHEET_PREVIEW_BODY_HEIGHT
+    )
   );
   const collapsedPlaceSheetTranslateY = Math.max(
     0,
-    expandedPlaceSheetHeight - sizes.placeInfoSheetOffset
+    expandedPlaceSheetHeight - collapsedPlaceSheetHeight
   );
+  const closedPlaceSheetTranslateY =
+    expandedPlaceSheetHeight + PLACE_SHEET_CLOSE_GAP;
 
   const cameraRef = useRef<Camera>(null);
+  const placeInfoScrollRef = useRef<ScrollView>(null);
+  const placeInfoScrollOffsetY = useRef(0);
   const placeDetailsRequestId = useRef(0);
 
   const recenterTranslateX = useRef(new Animated.Value(150)).current;
   const recenterWidth = useRef(new Animated.Value(132)).current;
   const recenterTextOpacity = useRef(new Animated.Value(1)).current;
   const recenterInnerPadding = useRef(new Animated.Value(0)).current;
-  const placeSheetTranslateY = useRef(new Animated.Value(420)).current;
-  const placeSheetDragY = useRef(new Animated.Value(0)).current;
-  const previousExpandedPlaceSheetHeight = useRef(expandedPlaceSheetHeight);
+  const placeSheetTranslateY = useRef(
+    new Animated.Value(windowHeight)
+  ).current;
+  const placeSheetPositionRef = useRef(windowHeight);
+  const placeSheetDragStartY = useRef(windowHeight);
+  const placeSheetGestureStartDyRef = useRef(0);
+  const placeSheetLatestGestureDyRef = useRef(0);
+  const placeSheetDragReadyRef = useRef(true);
+  const placeSheetPendingReleaseVelocityRef = useRef<number | null>(null);
+  const placeSheetDragStartSnapRef = useRef<"collapsed" | "expanded">(
+    "collapsed"
+  );
+  const placeSheetSnapRef = useRef<PlaceSheetSnap>("closed");
+  const placeSheetGeometryRef = useRef({
+    collapsedY: collapsedPlaceSheetTranslateY,
+    closedY: closedPlaceSheetTranslateY,
+  });
+  const isPlaceSheetExpandedRef = useRef(false);
+  const finishPlaceSheetDragRef = useRef<
+    (gesture: PanResponderGestureState) => void
+  >(() => {});
+  const settlePlaceSheetRef = useRef<(velocity: number) => void>(() => {});
+  const placeSheetAnimationId = useRef(0);
+  const placeDetailsLoadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+
+  placeSheetGeometryRef.current = {
+    collapsedY: collapsedPlaceSheetTranslateY,
+    closedY: closedPlaceSheetTranslateY,
+  };
 
   const [places, setPlaces] = useState<NiteLightPlace[]>([]);
   const [placesFromCache, setPlacesFromCache] = useState(false);
@@ -176,6 +251,8 @@ export default function MapScreen() {
   const [placeDetailsError, setPlaceDetailsError] = useState<string | null>(null);
   const [hasPhotoLoadFailed, setHasPhotoLoadFailed] = useState(false);
   const [isOpeningHoursListVisible, setIsOpeningHoursListVisible] = useState(false);
+  const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
+  const [imageViewerIndex, setImageViewerIndex] = useState(0);
 
   const [hasLocationPermission, setHasLocationPermission] = useState(
     Platform.OS === "ios"
@@ -186,29 +263,110 @@ export default function MapScreen() {
   const [showRecenterButton, setShowRecenterButton] = useState(false);
   const [isRecenterCollapsed, setIsRecenterCollapsed] = useState(false);
 
-  const placeSheetPanResponder = PanResponder.create({
-    onMoveShouldSetPanResponder: (_, gesture) =>
-      Math.abs(gesture.dy) > 6 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
-    onPanResponderGrant: () => {
-      placeSheetDragY.setValue(0);
-    },
-    onPanResponderMove: (_, gesture) => {
-      const minDragY = isPlaceSheetExpanded
-        ? 0
-        : -collapsedPlaceSheetTranslateY;
-      const maxDragY = isPlaceSheetExpanded ? expandedPlaceSheetHeight : 180;
+  const placeSheetPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) => {
+        const isVerticalGesture =
+          Math.abs(gesture.dy) > 4 &&
+          Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.15;
 
-      placeSheetDragY.setValue(
-        Math.max(minDragY, Math.min(maxDragY, gesture.dy))
-      );
-    },
-    onPanResponderRelease: (_, gesture) => {
-      finishPlaceSheetDrag(gesture);
-    },
-    onPanResponderTerminate: () => {
-      resetPlaceSheetDrag();
-    },
-  });
+        if (!isVerticalGesture) return false;
+        if (!isPlaceSheetExpandedRef.current) return true;
+
+        return gesture.dy > 0 && placeInfoScrollOffsetY.current <= 1;
+      },
+      onMoveShouldSetPanResponderCapture: (_, gesture) => {
+        const isVerticalGesture =
+          Math.abs(gesture.dy) > 4 &&
+          Math.abs(gesture.dy) > Math.abs(gesture.dx) * 1.15;
+
+        if (!isVerticalGesture) return false;
+        if (!isPlaceSheetExpandedRef.current) return true;
+
+        return gesture.dy > 0 && placeInfoScrollOffsetY.current <= 1;
+      },
+      onPanResponderGrant: (_, gesture) => {
+        placeSheetAnimationId.current += 1;
+        placeSheetDragReadyRef.current = false;
+        placeSheetPendingReleaseVelocityRef.current = null;
+        placeSheetLatestGestureDyRef.current = gesture.dy;
+        placeSheetDragStartSnapRef.current = isPlaceSheetExpandedRef.current
+          ? "expanded"
+          : "collapsed";
+        placeSheetSnapRef.current = "dragging";
+
+        if (placeDetailsLoadTimerRef.current) {
+          clearTimeout(placeDetailsLoadTimerRef.current);
+          placeDetailsLoadTimerRef.current = null;
+        }
+
+        placeSheetTranslateY.stopAnimation(value => {
+          const { closedY } = placeSheetGeometryRef.current;
+          const currentPosition = Math.max(0, Math.min(closedY, value));
+
+          placeSheetPositionRef.current = currentPosition;
+          placeSheetDragStartY.current = currentPosition;
+          placeSheetGestureStartDyRef.current =
+            placeSheetLatestGestureDyRef.current;
+          placeSheetTranslateY.setValue(currentPosition);
+          placeSheetDragReadyRef.current = true;
+
+          const pendingVelocity =
+            placeSheetPendingReleaseVelocityRef.current;
+          if (pendingVelocity !== null) {
+            placeSheetPendingReleaseVelocityRef.current = null;
+            settlePlaceSheetRef.current(pendingVelocity);
+          }
+        });
+      },
+      onPanResponderMove: (_, gesture) => {
+        placeSheetLatestGestureDyRef.current = gesture.dy;
+        if (!placeSheetDragReadyRef.current) return;
+
+        const { closedY } = placeSheetGeometryRef.current;
+        const dragDistance = gesture.dy - placeSheetGestureStartDyRef.current;
+        const nextPosition = Math.max(
+          0,
+          Math.min(closedY, placeSheetDragStartY.current + dragDistance)
+        );
+
+        placeSheetPositionRef.current = nextPosition;
+        placeSheetTranslateY.setValue(nextPosition);
+      },
+      onPanResponderRelease: (_, gesture) => {
+        placeSheetLatestGestureDyRef.current = gesture.dy;
+        if (!placeSheetDragReadyRef.current) {
+          placeSheetPendingReleaseVelocityRef.current = gesture.vy;
+          return;
+        }
+        finishPlaceSheetDragRef.current(gesture);
+      },
+      onPanResponderTerminate: (_, gesture) => {
+        placeSheetLatestGestureDyRef.current = gesture.dy;
+        if (!placeSheetDragReadyRef.current) {
+          placeSheetPendingReleaseVelocityRef.current = gesture.vy;
+          return;
+        }
+        finishPlaceSheetDragRef.current(gesture);
+      },
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
+    })
+  ).current;
+
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+
+    UIManager.setLayoutAnimationEnabledExperimental?.(true);
+
+    PermissionsAndroid.check(
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+    )
+      .then(setHasLocationPermission)
+      .catch(error => {
+        console.warn("Could not check location permission:", error);
+      });
+  }, []);
 
   useEffect(() => {
     const unsubscribe = listenToPlaces(
@@ -233,23 +391,36 @@ export default function MapScreen() {
   }, []);
 
   useEffect(() => {
-    const previousHeight = previousExpandedPlaceSheetHeight.current;
-    previousExpandedPlaceSheetHeight.current = expandedPlaceSheetHeight;
+    const listenerId = placeSheetTranslateY.addListener(({ value }) => {
+      placeSheetPositionRef.current = value;
+    });
 
-    if (!selectedPlace || previousHeight === expandedPlaceSheetHeight) return;
+    return () => {
+      placeSheetTranslateY.removeListener(listenerId);
+    };
+  }, [placeSheetTranslateY]);
 
-    placeSheetTranslateY.setValue(
-      isPlaceSheetExpanded ? 0 : collapsedPlaceSheetTranslateY
-    );
-    placeSheetDragY.setValue(0);
+  useEffect(() => {
+    if (selectedPlace) return;
+
+    placeSheetAnimationId.current += 1;
+    placeSheetSnapRef.current = "closed";
+    placeSheetPositionRef.current = closedPlaceSheetTranslateY;
+    placeSheetTranslateY.stopAnimation();
+    placeSheetTranslateY.setValue(closedPlaceSheetTranslateY);
   }, [
-    collapsedPlaceSheetTranslateY,
-    expandedPlaceSheetHeight,
-    isPlaceSheetExpanded,
-    placeSheetDragY,
+    closedPlaceSheetTranslateY,
     placeSheetTranslateY,
     selectedPlace,
   ]);
+
+  useEffect(() => {
+    return () => {
+      if (placeDetailsLoadTimerRef.current) {
+        clearTimeout(placeDetailsLoadTimerRef.current);
+      }
+    };
+  }, []);
 
   async function requestLocationPermission() {
     if (Platform.OS === "android") {
@@ -287,7 +458,10 @@ export default function MapScreen() {
     setUserCoordinate(coordinate);
 
     if (!hasCenteredOnce) {
-      centerCameraOnUser(coordinate);
+      if (centreOnLocation) {
+        centerCameraOnUser(coordinate);
+      }
+
       setHasCenteredOnce(true);
     }
   }
@@ -302,11 +476,10 @@ export default function MapScreen() {
     recenterInnerPadding.setValue(0);
 
     Animated.sequence([
-      Animated.spring(recenterTranslateX, {
+      Animated.timing(recenterTranslateX, {
         toValue: 0,
+        duration: 240,
         useNativeDriver: true,
-        friction: 8,
-        tension: 70,
       }),
 
       Animated.delay(1800),
@@ -339,58 +512,144 @@ export default function MapScreen() {
     animateRecenterButtonIn();
   }
 
-  function resetPlaceSheetDrag() {
-    Animated.spring(placeSheetDragY, {
-      toValue: 0,
-      useNativeDriver: true,
-      friction: 8,
-      tension: 80,
-    }).start();
+  function clampPlaceSheetPosition(value: number) {
+    return Math.max(0, Math.min(closedPlaceSheetTranslateY, value));
   }
 
-  function animatePlaceSheetTo(toValue: number) {
-    Animated.spring(placeSheetTranslateY, {
+  function scheduleSelectedPlaceDetailsLoad(
+    place = selectedPlace,
+    delay = 220
+  ) {
+    if (!place || selectedPlaceDetails || isPlaceDetailsLoading) return;
+
+    if (placeDetailsLoadTimerRef.current) {
+      clearTimeout(placeDetailsLoadTimerRef.current);
+    }
+
+    placeDetailsLoadTimerRef.current = setTimeout(() => {
+      placeDetailsLoadTimerRef.current = null;
+      void loadSelectedPlaceDetails(place);
+    }, delay);
+  }
+
+  function animatePlaceSheetTo(
+    toValue: number,
+    snap: Exclude<PlaceSheetSnap, "dragging">,
+    velocity = 0,
+    onComplete?: () => void
+  ) {
+    const animationId = placeSheetAnimationId.current + 1;
+    placeSheetAnimationId.current = animationId;
+    placeSheetSnapRef.current = snap;
+    placeSheetTranslateY.stopAnimation();
+
+    const currentPosition = placeSheetPositionRef.current;
+    const distance = Math.abs(toValue - currentPosition);
+    const distanceRatio = Math.min(
+      1,
+      distance / Math.max(1, expandedPlaceSheetHeight)
+    );
+    const velocityAdjustment = Math.min(55, Math.abs(velocity) * 24);
+    const duration = Math.max(
+      170,
+      Math.round(180 + 160 * distanceRatio - velocityAdjustment)
+    );
+
+    Animated.timing(placeSheetTranslateY, {
       toValue,
+      duration,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
-      friction: 9,
-      tension: 70,
-    }).start();
+    }).start(({ finished }) => {
+      if (!finished || placeSheetAnimationId.current !== animationId) return;
+
+      placeSheetPositionRef.current = toValue;
+      placeSheetTranslateY.setValue(toValue);
+      onComplete?.();
+    });
   }
 
-  function animatePlaceSheetIn() {
+  function expandPlaceSheet(releaseVelocity = 0) {
+    isPlaceSheetExpandedRef.current = true;
+    placeInfoScrollOffsetY.current = 0;
+    placeInfoScrollRef.current?.scrollTo({ y: 0, animated: false });
+    animatePlaceSheetTo(0, "expanded", releaseVelocity, () => {
+      setIsPlaceSheetExpanded(true);
+      scheduleSelectedPlaceDetailsLoad(selectedPlace, 80);
+    });
+  }
+
+  function collapsePlaceSheet(releaseVelocity = 0) {
+    isPlaceSheetExpandedRef.current = false;
     setIsPlaceSheetExpanded(false);
-    placeSheetTranslateY.setValue(expandedPlaceSheetHeight);
-    placeSheetDragY.setValue(0);
-    animatePlaceSheetTo(collapsedPlaceSheetTranslateY);
+    animatePlaceSheetTo(
+      collapsedPlaceSheetTranslateY,
+      "collapsed",
+      releaseVelocity,
+      () => {
+        placeInfoScrollOffsetY.current = 0;
+        placeInfoScrollRef.current?.scrollTo({ y: 0, animated: false });
+        setIsOpeningHoursListVisible(false);
+        scheduleSelectedPlaceDetailsLoad(selectedPlace, 180);
+      }
+    );
   }
 
-  function expandPlaceSheet() {
-    setIsPlaceSheetExpanded(true);
-    placeSheetDragY.setValue(0);
-    animatePlaceSheetTo(0);
-    void loadSelectedPlaceDetails();
+  function settlePlaceSheet(releaseVelocity: number) {
+    const currentPosition = placeSheetPositionRef.current;
+    const projectedPosition = clampPlaceSheetPosition(
+      currentPosition + releaseVelocity * 120
+    );
+    const startedExpanded = placeSheetDragStartSnapRef.current === "expanded";
+    const expandThreshold = collapsedPlaceSheetTranslateY * 0.52;
+    const closeThreshold =
+      collapsedPlaceSheetTranslateY + Math.max(72, PLACE_SHEET_CLOSE_GAP);
+
+    if (releaseVelocity < -0.5) {
+      expandPlaceSheet(releaseVelocity);
+      return;
+    }
+
+    if (releaseVelocity > 0.75) {
+      if (
+        !startedExpanded ||
+        currentPosition > collapsedPlaceSheetTranslateY + 28
+      ) {
+        handleClosePlaceInfo(releaseVelocity);
+      } else {
+        collapsePlaceSheet(releaseVelocity);
+      }
+      return;
+    }
+
+    if (projectedPosition < expandThreshold) {
+      expandPlaceSheet(releaseVelocity);
+      return;
+    }
+
+    if (projectedPosition > closeThreshold) {
+      handleClosePlaceInfo(releaseVelocity);
+      return;
+    }
+
+    collapsePlaceSheet(releaseVelocity);
   }
 
   function finishPlaceSheetDrag(gesture: PanResponderGestureState) {
-    const shouldClose = gesture.dy > 80 || gesture.vy > 0.75;
-    const shouldExpand = gesture.dy < -70 || gesture.vy < -0.75;
+    settlePlaceSheet(gesture.vy);
+  }
 
-    if (shouldClose) {
-      handleClosePlaceInfo();
-      return;
-    }
+  settlePlaceSheetRef.current = settlePlaceSheet;
+  finishPlaceSheetDragRef.current = finishPlaceSheetDrag;
 
-    if (shouldExpand) {
-      expandPlaceSheet();
-      return;
-    }
-
-    resetPlaceSheetDrag();
+  function toggleOpeningHoursList() {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setIsOpeningHoursListVisible(value => !value);
   }
 
   async function loadSelectedPlaceDetails(
     place = selectedPlace,
-    options: { ignoreCurrentState?: boolean } = {}
+    options: { ignoreCurrentState?: boolean; } = {}
   ) {
     if (!place) return;
 
@@ -421,9 +680,7 @@ export default function MapScreen() {
 
       if (placeDetailsRequestId.current === requestId) {
         setPlaceDetailsError(
-          error instanceof Error
-            ? `Saved info shown. ${error.message}`
-            : "Saved info shown. Live Google details unavailable."
+          "Saved information shown. Live details are unavailable right now."
         );
       }
     } finally {
@@ -435,6 +692,16 @@ export default function MapScreen() {
 
   async function handlePlacePress(place: NiteLightPlace) {
     placeDetailsRequestId.current += 1;
+    placeSheetAnimationId.current += 1;
+    placeSheetTranslateY.stopAnimation();
+    placeSheetDragReadyRef.current = true;
+    placeSheetPendingReleaseVelocityRef.current = null;
+    placeSheetSnapRef.current = "collapsed";
+    isPlaceSheetExpandedRef.current = false;
+    setIsPlaceSheetExpanded(false);
+
+    placeSheetPositionRef.current = collapsedPlaceSheetTranslateY;
+    placeSheetTranslateY.setValue(collapsedPlaceSheetTranslateY);
 
     setSelectedPlace(place);
     setSelectedPlaceDetails(null);
@@ -442,36 +709,52 @@ export default function MapScreen() {
     setIsPlaceDetailsLoading(false);
     setHasPhotoLoadFailed(false);
     setIsOpeningHoursListVisible(false);
-    animatePlaceSheetIn();
-    void loadSelectedPlaceDetails(place, { ignoreCurrentState: true });
+    placeInfoScrollOffsetY.current = 0;
+    placeInfoScrollRef.current?.scrollTo({ y: 0, animated: false });
+    setIsImageViewerVisible(false);
+    setImageViewerIndex(0);
+
+    if (placeDetailsLoadTimerRef.current) {
+      clearTimeout(placeDetailsLoadTimerRef.current);
+    }
+    placeDetailsLoadTimerRef.current = setTimeout(() => {
+      placeDetailsLoadTimerRef.current = null;
+      void loadSelectedPlaceDetails(place, { ignoreCurrentState: true });
+    }, 260);
   }
 
-  function handleClosePlaceInfo() {
+  function handleClosePlaceInfo(releaseVelocity = 0) {
+    if (placeDetailsLoadTimerRef.current) {
+      clearTimeout(placeDetailsLoadTimerRef.current);
+      placeDetailsLoadTimerRef.current = null;
+    }
+
     const closeRequestId = placeDetailsRequestId.current + 1;
     placeDetailsRequestId.current = closeRequestId;
     setPlaceDetailsError(null);
     setIsPlaceDetailsLoading(false);
+    placeSheetDragReadyRef.current = true;
+    placeSheetPendingReleaseVelocityRef.current = null;
+    isPlaceSheetExpandedRef.current = false;
     setIsPlaceSheetExpanded(false);
     setHasPhotoLoadFailed(false);
     setIsOpeningHoursListVisible(false);
+    placeInfoScrollOffsetY.current = 0;
+    placeInfoScrollRef.current?.scrollTo({ y: 0, animated: false });
+    setIsImageViewerVisible(false);
+    setImageViewerIndex(0);
 
-    Animated.parallel([
-      Animated.timing(placeSheetTranslateY, {
-        toValue: expandedPlaceSheetHeight,
-        duration: 220,
-        useNativeDriver: true,
-      }),
-      Animated.timing(placeSheetDragY, {
-        toValue: 0,
-        duration: 120,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      if (placeDetailsRequestId.current !== closeRequestId) return;
+    animatePlaceSheetTo(
+      closedPlaceSheetTranslateY,
+      "closed",
+      Math.max(0, releaseVelocity),
+      () => {
+        if (placeDetailsRequestId.current !== closeRequestId) return;
 
-      setSelectedPlace(null);
-      setSelectedPlaceDetails(null);
-    });
+        setSelectedPlace(null);
+        setSelectedPlaceDetails(null);
+      }
+    );
   }
 
   async function openUrl(url: string, errorMessage: string) {
@@ -488,7 +771,7 @@ export default function MapScreen() {
 
     openUrl(
       getMapsUrl(selectedPlace, selectedPlaceDetails),
-      "Try opening this place manually in Google Maps."
+      "Try opening this support location manually in Google Maps."
     );
   }
 
@@ -497,7 +780,7 @@ export default function MapScreen() {
 
     openUrl(
       selectedPlaceDetails.websiteUri,
-      "Try opening this place website manually."
+      "Try opening this organisation website manually."
     );
   }
 
@@ -523,6 +806,112 @@ export default function MapScreen() {
     });
   }
 
+  function getSelectedPlacePhotos() {
+    if (!selectedPlace) return [];
+
+    const savedImageUri = selectedPlace.imageUrl ?? selectedPlace.photoUrl;
+    const photos = [...(selectedPlaceDetails?.photos ?? [])];
+
+    if (selectedPlaceDetails?.photoUri && !photos.some(photo => photo.uri === selectedPlaceDetails.photoUri)) {
+      photos.unshift({
+        uri: selectedPlaceDetails.photoUri,
+        attributions: selectedPlaceDetails.photoAttributions,
+      });
+    }
+
+    if (savedImageUri && !photos.some(photo => photo.uri === savedImageUri)) {
+      photos.push({ uri: savedImageUri });
+    }
+
+    return photos.filter(
+      (photo, index, allPhotos) =>
+        Boolean(photo.uri) && allPhotos.findIndex(item => item.uri === photo.uri) === index
+    );
+  }
+
+  function openImageViewer(index = 0) {
+    const photos = getSelectedPlacePhotos();
+    if (!photos.length) return;
+
+    setImageViewerIndex(Math.max(0, Math.min(index, photos.length - 1)));
+    setIsImageViewerVisible(true);
+  }
+
+  function renderImageViewer() {
+    const photos = getSelectedPlacePhotos();
+    if (!photos.length) return null;
+
+    const currentPhoto = photos[imageViewerIndex] ?? photos[0];
+    const attribution = currentPhoto.attributions?.length
+      ? `Photo: ${currentPhoto.attributions.join(", ")}`
+      : null;
+
+    return (
+      <Modal
+        visible={isImageViewerVisible}
+        animationType="fade"
+        presentationStyle="fullScreen"
+        statusBarTranslucent
+        onRequestClose={() => setIsImageViewerVisible(false)}
+      >
+        <View style={mapStyles.imageViewer}>
+          <FlatList
+            data={photos}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            initialScrollIndex={imageViewerIndex}
+            getItemLayout={(_, index) => ({
+              length: windowWidth,
+              offset: windowWidth * index,
+              index,
+            })}
+            keyExtractor={photo => photo.uri}
+            onMomentumScrollEnd={event => {
+              const nextIndex = Math.round(
+                event.nativeEvent.contentOffset.x / windowWidth
+              );
+              setImageViewerIndex(nextIndex);
+            }}
+            renderItem={({ item }) => (
+              <View style={[mapStyles.imageViewerSlide, { width: windowWidth }]}>
+                <Image
+                  source={{ uri: item.uri }}
+                  style={mapStyles.imageViewerImage}
+                  resizeMode="contain"
+                />
+              </View>
+            )}
+          />
+
+          <View style={mapStyles.imageViewerTopBar}>
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={() => setIsImageViewerVisible(false)}
+              style={mapStyles.imageViewerCloseButton}
+              accessibilityRole="button"
+              accessibilityLabel="Close image viewer"
+            >
+              <Text style={mapStyles.imageViewerCloseText}>×</Text>
+            </TouchableOpacity>
+
+            <Text style={mapStyles.imageViewerCounter}>
+              {imageViewerIndex + 1} / {photos.length}
+            </Text>
+          </View>
+
+          {attribution && (
+            <View style={mapStyles.imageViewerAttribution}>
+              <Text style={mapStyles.imageViewerAttributionText} numberOfLines={2}>
+                {attribution}
+              </Text>
+            </View>
+          )}
+        </View>
+      </Modal>
+    );
+  }
+
   function renderSelectedPlaceInfo() {
     if (!selectedPlace) return null;
 
@@ -533,11 +922,10 @@ export default function MapScreen() {
     const rating = selectedPlaceDetails?.rating;
     const ratingText =
       typeof rating === "number"
-        ? `${rating.toFixed(1)} / 5${
-            selectedPlaceDetails?.userRatingCount
-              ? ` (${selectedPlaceDetails.userRatingCount} reviews)`
-              : ""
-          }`
+        ? `${rating.toFixed(1)} / 5${selectedPlaceDetails?.userRatingCount
+          ? ` (${selectedPlaceDetails.userRatingCount} reviews)`
+          : ""
+        }`
         : null;
     const liveOpenText = getLiveOpeningText(selectedPlaceDetails);
     const savedImageUri = selectedPlace.imageUrl ?? selectedPlace.photoUrl;
@@ -548,7 +936,9 @@ export default function MapScreen() {
         : null
       : googlePhotoUri ?? savedImageUri;
     const photoAttribution =
-      googlePhotoUri && photoUri === googlePhotoUri && selectedPlaceDetails?.photoAttributions?.length
+      googlePhotoUri &&
+      photoUri === googlePhotoUri &&
+      selectedPlaceDetails?.photoAttributions?.length
         ? `Photo: ${selectedPlaceDetails.photoAttributions.join(", ")}`
         : null;
     const openingHourDescriptions = selectedPlaceDetails?.weekdayDescriptions?.length
@@ -558,247 +948,449 @@ export default function MapScreen() {
       status === "open"
         ? colour.success
         : status === "closed"
-        ? colour.textSecondary
-        : colour.warning;
+          ? colour.textSecondary
+          : colour.warning;
+    const previewPhotoIndex = Math.max(
+      0,
+      getSelectedPlacePhotos().findIndex(photo => photo.uri === photoUri)
+    );
+    const placeSheetBackdropOpacity = placeSheetTranslateY.interpolate({
+      inputRange: [0, Math.max(1, collapsedPlaceSheetTranslateY)],
+      outputRange: [0.18, 0],
+      extrapolate: "clamp",
+    });
+    const placeSheetTopPaddingOpacity = placeSheetTranslateY.interpolate({
+      inputRange: [
+        0,
+        Math.max(1, collapsedPlaceSheetTranslateY * 0.55),
+        Math.max(2, collapsedPlaceSheetTranslateY),
+      ],
+      outputRange: [1, 0.35, 0],
+      extrapolate: "clamp",
+    });
 
     return (
-      <Animated.View
-        style={[
-          mapStyles.placeInfoCard,
-          {
-            backgroundColor: colour.surface,
-            borderColor: colour.border,
-            height: expandedPlaceSheetHeight,
-            transform: [
-              { translateY: Animated.add(placeSheetTranslateY, placeSheetDragY) },
-            ],
-          },
-        ]}
-      >
-        {photoUri ? (
-          <View
-            style={[
-              mapStyles.placeInfoImageWrap,
-              isPlaceSheetExpanded && mapStyles.placeInfoImageWrapExpanded,
-            ]}
-          >
-            <Image
-              source={{ uri: photoUri }}
-              style={mapStyles.placeInfoImage}
-              onError={() => setHasPhotoLoadFailed(true)}
-            />
-
-            <View
-              {...placeSheetPanResponder.panHandlers}
-              style={mapStyles.placeInfoDragHandleTouchArea}
-            >
-              <View
-                style={[
-                  mapStyles.placeInfoDragHandle,
-                  {
-                    backgroundColor: colour.surface,
-                    borderColor: colour.border,
-                  },
-                ]}
-              />
-            </View>
-
-            {photoAttribution && (
-              <View style={mapStyles.placeInfoPhotoCreditPill}>
-                <Text
-                  style={mapStyles.placeInfoPhotoCreditText}
-                  numberOfLines={1}
-                >
-                  {photoAttribution}
-                </Text>
-              </View>
-            )}
-          </View>
-        ) : (
-          <View
-            style={[
-              mapStyles.placeInfoImagePlaceholder,
-              isPlaceSheetExpanded && mapStyles.placeInfoImageWrapExpanded,
-              { backgroundColor: colour.surfaceSecondary },
-            ]}
-          >
-            <View
-              {...placeSheetPanResponder.panHandlers}
-              style={mapStyles.placeInfoDragHandleTouchArea}
-            >
-              <View
-                style={[
-                  mapStyles.placeInfoDragHandle,
-                  {
-                    backgroundColor: colour.surface,
-                    borderColor: colour.border,
-                  },
-                ]}
-              />
-            </View>
-
-            <Text style={[mapStyles.placeInfoImagePlaceholderText, { color: colour.textSecondary }]}>
-              {isPlaceDetailsLoading ? "Loading image preview" : "No image preview yet"}
-            </Text>
-          </View>
-        )}
-
-        <ScrollView
-          style={mapStyles.placeInfoScroll}
-          contentContainerStyle={[
-            mapStyles.placeInfoBody,
-            isPlaceSheetExpanded && mapStyles.placeInfoBodyExpanded,
+      <>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            mapStyles.placeInfoBackdrop,
+            { opacity: placeSheetBackdropOpacity },
           ]}
-          scrollEnabled={isPlaceSheetExpanded}
-          showsVerticalScrollIndicator={isPlaceSheetExpanded}
-        >
-          <View style={mapStyles.placeInfoHeader}>
-          <View style={mapStyles.placeInfoContent}>
-            <Text style={[mapStyles.placeInfoTitle, { color: colour.text }]}>
-              {title}
-            </Text>
+        />
 
-            <Text style={[mapStyles.placeInfoMeta, { color: statusColor }]}>
-              {formatPlaceType(selectedPlace.type)} • {liveOpenText ?? placeStatusLabels[status]}
-            </Text>
-          </View>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            mapStyles.placeInfoTopPadding,
+            {
+              height: placeSheetTopInset,
+              backgroundColor: colour.surfaceSecondary,
+              opacity: placeSheetTopPaddingOpacity,
+            },
+          ]}
+        />
+
+        <Animated.View
+          {...placeSheetPanResponder.panHandlers}
+          renderToHardwareTextureAndroid
+          shouldRasterizeIOS
+          style={[
+            mapStyles.placeInfoCard,
+            {
+              backgroundColor: colour.surface,
+              borderColor: colour.border,
+              borderTopColor: colour.primary,
+              height: expandedPlaceSheetHeight,
+              transform: [{ translateY: placeSheetTranslateY }],
+            },
+          ]}
+        >
+          {photoUri ? (
+            <View
+              style={[
+                mapStyles.placeInfoImageWrap,
+                { height: placeInfoImageHeight },
+              ]}
+            >
+              <TouchableOpacity
+                activeOpacity={0.88}
+                onPress={() => openImageViewer(previewPhotoIndex)}
+                style={mapStyles.placeInfoImageButton}
+                accessibilityRole="imagebutton"
+                accessibilityLabel="Open support location photos full screen"
+              >
+                <Image
+                  source={{ uri: photoUri }}
+                  style={mapStyles.placeInfoImage}
+                  resizeMode="cover"
+                  onError={() => setHasPhotoLoadFailed(true)}
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.78}
+                onPress={() => handleClosePlaceInfo()}
+                style={mapStyles.placeInfoImageCloseIcon}
+                accessibilityRole="button"
+                accessibilityLabel="Close support location details"
+              >
+                <Ionicons name="close" size={22} color="#FFFFFF" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.78}
+                onPress={() => openImageViewer(previewPhotoIndex)}
+                style={mapStyles.placeInfoImageExpandIcon}
+                accessibilityRole="button"
+                accessibilityLabel="Expand support location photo"
+              >
+                <Ionicons name="expand-outline" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+
+              {photoAttribution && (
+                <View
+                  pointerEvents="none"
+                  style={mapStyles.placeInfoPhotoCreditPill}
+                >
+                  <Text
+                    style={mapStyles.placeInfoPhotoCreditText}
+                    numberOfLines={1}
+                  >
+                    {photoAttribution}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ) : (
+            <View
+              style={[
+                mapStyles.placeInfoImagePlaceholder,
+                {
+                  backgroundColor: colour.surfaceSecondary,
+                  height: placeInfoImageHeight,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  mapStyles.placeInfoImagePlaceholderText,
+                  { color: colour.textSecondary },
+                ]}
+              >
+                {isPlaceDetailsLoading
+                  ? "Loading image preview"
+                  : "No image preview yet"}
+              </Text>
+
+              <TouchableOpacity
+                activeOpacity={0.78}
+                onPress={() => handleClosePlaceInfo()}
+                style={mapStyles.placeInfoImageCloseIcon}
+                accessibilityRole="button"
+                accessibilityLabel="Close support location details"
+              >
+                <Ionicons name="close" size={22} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          )}
 
           <TouchableOpacity
-            activeOpacity={0.75}
-            onPress={handleClosePlaceInfo}
+            activeOpacity={0.78}
+            onPress={() => {
+              if (isPlaceSheetExpanded) {
+                collapsePlaceSheet();
+              } else {
+                expandPlaceSheet();
+              }
+            }}
             style={[
-              mapStyles.placeInfoCloseButton,
-              { backgroundColor: colour.surfaceSecondary },
+              mapStyles.placeInfoDragHandleTouchArea,
+              {
+                backgroundColor: colour.surfaceSecondary,
+                borderBottomColor: colour.border,
+              },
             ]}
+            accessibilityRole="button"
+            accessibilityLabel={
+              isPlaceSheetExpanded
+                ? "Minimise support location details"
+                : "Expand support location details"
+            }
           >
-            <Text style={[mapStyles.placeInfoCloseText, { color: colour.text }]}>×</Text>
+            <View
+              style={[
+                mapStyles.placeInfoDragHandle,
+                { backgroundColor: colour.textSecondary },
+              ]}
+            />
           </TouchableOpacity>
-        </View>
 
-        {address && (
-          <Text style={[mapStyles.placeInfoAddress, { color: colour.textSecondary }]}>
-            {address}
-          </Text>
-        )}
-
-        {!isPlaceSheetExpanded && selectedPlace.placeId && isPlaceDetailsLoading && (
-          <Text style={[mapStyles.placeInfoHint, { color: colour.textSecondary }]}>
-            Loading live photo and details…
-          </Text>
-        )}
-
-        {isPlaceDetailsLoading && (
-          <View style={mapStyles.placeInfoLoadingRow}>
-            <ActivityIndicator />
-            <Text style={[mapStyles.placeInfoLoadingText, { color: colour.textSecondary }]}>
-              Loading place details...
-            </Text>
-          </View>
-        )}
-
-        {ratingText && (
-          <View style={mapStyles.placeInfoRow}>
-            <Text style={[mapStyles.placeInfoLabel, { color: colour.textSecondary }]}>Rating</Text>
-            <Text style={[mapStyles.placeInfoValue, { color: colour.text }]}>
-              {ratingText}
-            </Text>
-          </View>
-        )}
-
-        {selectedPlaceDetails?.phoneNumber && (
-          <View style={mapStyles.placeInfoRow}>
-            <Text style={[mapStyles.placeInfoLabel, { color: colour.textSecondary }]}>Phone</Text>
-            <Text style={[mapStyles.placeInfoValue, { color: colour.text }]}>
-              {selectedPlaceDetails.phoneNumber}
-            </Text>
-          </View>
-        )}
-
-        {businessStatus && (
-          <View style={mapStyles.placeInfoRow}>
-            <Text style={[mapStyles.placeInfoLabel, { color: colour.textSecondary }]}>Status</Text>
-            <Text style={[mapStyles.placeInfoValue, { color: colour.text }]}>
-              {businessStatus}
-            </Text>
-          </View>
-        )}
-
-        {placeDetailsError && (
-          <Text style={[mapStyles.placeInfoError, { color: colour.textSecondary }]}>
-            {placeDetailsError}
-          </Text>
-        )}
-
-        {isPlaceSheetExpanded && (
-          <View style={mapStyles.placeInfoExpandedSection}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => setIsOpeningHoursListVisible(value => !value)}
-              style={mapStyles.placeInfoHoursToggle}
+          <ScrollView
+            ref={placeInfoScrollRef}
+            style={mapStyles.placeInfoScroll}
+            contentContainerStyle={mapStyles.placeInfoBody}
+            scrollEnabled={isPlaceSheetExpanded}
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={isPlaceSheetExpanded}
+            scrollEventThrottle={16}
+            onScroll={event => {
+              placeInfoScrollOffsetY.current = event.nativeEvent.contentOffset.y;
+            }}
+          >
+            <View
+              style={[
+                mapStyles.placeInfoHeader,
+                { borderBottomColor: colour.border },
+              ]}
             >
-              <View style={mapStyles.placeInfoHoursToggleTextWrap}>
-                <Text style={[mapStyles.placeInfoSectionTitle, { color: colour.text }]}>
-                  Opening hours
+              <View style={mapStyles.placeInfoContent}>
+                <Text
+                  style={[mapStyles.placeInfoTitle, { color: colour.text }]}
+                  numberOfLines={2}
+                >
+                  {title}
                 </Text>
-                <Text style={[mapStyles.placeInfoHoursSummary, { color: colour.textSecondary }]}>
-                  {liveOpenText ?? placeStatusLabels[status]}
+
+                <Text
+                  style={[mapStyles.placeInfoMeta, { color: statusColor }]}
+                  numberOfLines={2}
+                >
+                  {formatPlaceType(selectedPlace.type)} • {liveOpenText ?? placeStatusLabels[status]}
                 </Text>
               </View>
+            </View>
 
-              <Text style={[mapStyles.placeInfoHoursToggleHint, { color: colour.textSecondary }]}>
-                {isOpeningHoursListVisible ? "Hide list" : "Tap for full list"}
+            {address && (
+              <Text
+                style={[
+                  mapStyles.placeInfoAddress,
+                  { color: colour.textSecondary },
+                ]}
+                numberOfLines={2}
+              >
+                {address}
               </Text>
-            </TouchableOpacity>
+            )}
 
-            {isOpeningHoursListVisible &&
-              openingHourDescriptions.map(line => (
-                <Text
-                  key={line}
-                  style={[mapStyles.placeInfoHoursText, { color: colour.textSecondary }]}
-                >
-                  {line}
-                </Text>
-              ))}
-          </View>
-        )}
-
-          <View style={mapStyles.placeInfoActions}>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={handleOpenSelectedPlaceInMaps}
-              style={[mapStyles.placeInfoButton, { backgroundColor: colour.primary }]}
+            <View
+              style={[
+                mapStyles.placeInfoActions,
+                { borderTopColor: colour.border },
+              ]}
             >
-              <Text style={mapStyles.placeInfoButtonText}>Open map</Text>
-            </TouchableOpacity>
-
-            {selectedPlaceDetails?.websiteUri && (
               <TouchableOpacity
                 activeOpacity={0.85}
-                onPress={handleOpenSelectedPlaceWebsite}
+                onPress={handleOpenSelectedPlaceInMaps}
                 style={[
                   mapStyles.placeInfoButton,
-                  mapStyles.placeInfoButtonSecondary,
+                  {
+                    backgroundColor: colour.primary,
+                    borderColor: colour.primaryHover,
+                  },
+                ]}
+              >
+                <Text style={mapStyles.placeInfoButtonText}>Directions</Text>
+              </TouchableOpacity>
+
+              {selectedPlaceDetails?.websiteUri && (
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={handleOpenSelectedPlaceWebsite}
+                  style={[
+                    mapStyles.placeInfoButton,
+                    mapStyles.placeInfoButtonSecondary,
+                    { borderColor: colour.border },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      mapStyles.placeInfoSecondaryButtonText,
+                      { color: colour.text },
+                    ]}
+                  >
+                    Website
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View
+              pointerEvents={isPlaceSheetExpanded ? "auto" : "none"}
+              style={mapStyles.placeInfoDetailsReveal}
+            >
+              {isPlaceDetailsLoading && (
+                <View style={mapStyles.placeInfoLoadingRow}>
+                  <ActivityIndicator />
+                  <Text
+                    style={[
+                      mapStyles.placeInfoLoadingText,
+                      { color: colour.textSecondary },
+                    ]}
+                  >
+                    Loading service details...
+                  </Text>
+                </View>
+              )}
+
+              {ratingText && (
+                <View
+                  style={[
+                    mapStyles.placeInfoRow,
+                    { borderTopColor: colour.border },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      mapStyles.placeInfoLabel,
+                      { color: colour.textSecondary },
+                    ]}
+                  >
+                    Google rating
+                  </Text>
+                  <Text style={[mapStyles.placeInfoValue, { color: colour.text }]}>
+                    {ratingText}
+                  </Text>
+                </View>
+              )}
+
+              {selectedPlaceDetails?.phoneNumber && (
+                <View
+                  style={[
+                    mapStyles.placeInfoRow,
+                    { borderTopColor: colour.border },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      mapStyles.placeInfoLabel,
+                      { color: colour.textSecondary },
+                    ]}
+                  >
+                    Phone
+                  </Text>
+                  <Text style={[mapStyles.placeInfoValue, { color: colour.text }]}>
+                    {selectedPlaceDetails.phoneNumber}
+                  </Text>
+                </View>
+              )}
+
+              {businessStatus && (
+                <View
+                  style={[
+                    mapStyles.placeInfoRow,
+                    { borderTopColor: colour.border },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      mapStyles.placeInfoLabel,
+                      { color: colour.textSecondary },
+                    ]}
+                  >
+                    Service status
+                  </Text>
+                  <Text style={[mapStyles.placeInfoValue, { color: colour.text }]}>
+                    {businessStatus}
+                  </Text>
+                </View>
+              )}
+
+              {placeDetailsError && (
+                <Text
+                  style={[
+                    mapStyles.placeInfoError,
+                    { color: colour.textSecondary },
+                  ]}
+                >
+                  {placeDetailsError}
+                </Text>
+              )}
+
+              <View
+                style={[
+                  mapStyles.placeInfoExpandedSection,
                   { borderColor: colour.border },
                 ]}
               >
-                <Text
-                  style={[
-                    mapStyles.placeInfoSecondaryButtonText,
-                    { color: colour.text },
-                  ]}
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={toggleOpeningHoursList}
+                  style={mapStyles.placeInfoHoursToggle}
                 >
-                  Website
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </ScrollView>
-      </Animated.View>
+                  <View style={mapStyles.placeInfoHoursToggleTextWrap}>
+                    <Text
+                      style={[
+                        mapStyles.placeInfoSectionTitle,
+                        { color: colour.text },
+                      ]}
+                    >
+                      Opening hours
+                    </Text>
+                    <Text
+                      style={[
+                        mapStyles.placeInfoHoursSummary,
+                        { color: colour.textSecondary },
+                      ]}
+                    >
+                      {liveOpenText ?? placeStatusLabels[status]}
+                    </Text>
+                  </View>
+
+                  <View style={mapStyles.placeInfoHoursToggleAction}>
+                    <Text
+                      style={[
+                        mapStyles.placeInfoHoursToggleHint,
+                        { color: colour.textSecondary },
+                      ]}
+                    >
+                      {isOpeningHoursListVisible ? "Hide" : "View"}
+                    </Text>
+                    <Ionicons
+                      name={
+                        isOpeningHoursListVisible
+                          ? "chevron-up"
+                          : "chevron-down"
+                      }
+                      size={18}
+                      color={colour.textSecondary}
+                    />
+                  </View>
+                </TouchableOpacity>
+
+                {isOpeningHoursListVisible &&
+                  openingHourDescriptions.map(line => (
+                    <Text
+                      key={line}
+                      style={[
+                        mapStyles.placeInfoHoursText,
+                        { color: colour.textSecondary },
+                      ]}
+                    >
+                      {line}
+                    </Text>
+                  ))}
+              </View>
+            </View>
+          </ScrollView>
+        </Animated.View>
+      </>
     );
   }
 
   return (
-    <View style={[mapStyles.container, { backgroundColor: colour.background }]}>
+    <View
+      style={[mapStyles.container, { backgroundColor: colour.background }]}
+      onLayout={event => {
+        const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+
+        const heightChanged = Math.abs(nextHeight - mapViewportHeight) > 2;
+
+        if (nextHeight > 0 && heightChanged && !selectedPlace) {
+          setMapViewportHeight(nextHeight);
+        }
+      }}
+    >
       <Mapbox.MapView
         style={mapStyles.map}
         styleURL={Mapbox.StyleURL.Street}
@@ -837,7 +1429,12 @@ export default function MapScreen() {
       </Mapbox.MapView>
 
       {placesFromCache && (
-        <View style={[mapStyles.cacheBadge, { backgroundColor: colour.surface }]}>
+        <View
+          style={[
+            mapStyles.cacheBadge,
+            { backgroundColor: colour.surface, borderColor: colour.border },
+          ]}
+        >
           <Text style={[mapStyles.cacheBadgeText, { color: colour.textSecondary }]}>
             Cached
           </Text>
@@ -846,16 +1443,10 @@ export default function MapScreen() {
 
       {renderSelectedPlaceInfo()}
 
-      {showRecenterButton && userCoordinate && (
+      {showRecenterButton && userCoordinate && !selectedPlace && (
         <Animated.View
           style={[
             mapStyles.recenterButtonWrapper,
-            selectedPlace && {
-              bottom:
-                (isPlaceSheetExpanded
-                  ? expandedPlaceSheetHeight
-                  : sizes.placeInfoSheetOffset) + spacing.xl,
-            },
             {
               transform: [{ translateX: recenterTranslateX }],
             },
@@ -897,8 +1488,19 @@ export default function MapScreen() {
         </Animated.View>
       )}
 
+      {renderImageViewer()}
+
       {!hasLocationPermission && (
-        <View style={[mapStyles.permissionCard, { backgroundColor: colour.surface }]}>
+        <View
+          style={[
+            mapStyles.permissionCard,
+            {
+              backgroundColor: colour.surface,
+              borderColor: colour.border,
+              borderLeftColor: colour.primary,
+            },
+          ]}
+        >
           <Text style={[mapStyles.permissionText, { color: colour.text }]}>
             Allow location to show where you are on the map.
           </Text>

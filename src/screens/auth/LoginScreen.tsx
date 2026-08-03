@@ -64,7 +64,12 @@ export default function LoginScreen({
         <Text style={[authStyles.backButtonText, { color: colour.textSecondary }]}>Back</Text>
       </TouchableOpacity>
 
-      <Text style={[authStyles.formTitle, { color: colour.text }]}>Welcome back</Text>
+      <View style={authStyles.formHeader}>
+        <Text style={[authStyles.formTitle, { color: colour.text }]}>Welcome back</Text>
+        <View
+          style={[authStyles.formRule, { backgroundColor: colour.primary }]}
+        />
+      </View>
 
       <AuthInput
         label="Email, phone, or username"

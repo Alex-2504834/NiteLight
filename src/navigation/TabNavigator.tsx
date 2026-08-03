@@ -5,6 +5,7 @@ import HomeScreen from "../screens/HomeScreen";
 import MapScreen from "../screens/MapScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 import { createTabBarStyles } from "../styles/global";
+import { useAppPreferences } from "../settings/AppPreferencesContext";
 import { useTheme } from "../styles/useTheme";
 
 const Tab = createBottomTabNavigator();
@@ -28,9 +29,13 @@ const SettingsTabIcon = ({ color, size }: IconProps) => (
 
 export default function TabNavigator() {
   const { colour } = useTheme();
+  const { openMapOnLaunch } = useAppPreferences();
 
   return (
-    <Tab.Navigator screenOptions={{ headerShown: false, ...createTabBarStyles(colour) }}>
+    <Tab.Navigator
+      initialRouteName={openMapOnLaunch ? "Map" : "Home"}
+      screenOptions={{ headerShown: false, ...createTabBarStyles(colour) }}
+    >
       <Tab.Screen
         name="Home"
         component={HomeScreen}
@@ -39,7 +44,7 @@ export default function TabNavigator() {
       <Tab.Screen
         name="Map"
         component={MapScreen}
-        options={{ tabBarIcon: MapTabIcon }}
+        options={{ tabBarIcon: MapTabIcon, tabBarLabel: "Map" }}
       />
       <Tab.Screen
         name="Settings"

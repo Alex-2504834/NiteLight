@@ -87,9 +87,13 @@ export const spacing = {
 
 export const radius = {
   none: 0,
-  md: 24,
-  lg: 28,
-  pill: 999,
+  sm: 2,
+  actionSmall: 6,
+  action: 8,
+  md: 0,
+  lg: 0,
+  pill: 0,
+  round: 999,
 } as const;
 
 export const typography = {
@@ -98,12 +102,12 @@ export const typography = {
     fontWeight: "600",
   },
   appName: {
-    fontSize: 34,
-    fontWeight: "800",
+    fontSize: 32,
+    fontWeight: "700",
   },
   formTitle: {
     fontSize: 28,
-    fontWeight: "800",
+    fontWeight: "600",
   },
   body: {
     fontSize: 16,
@@ -114,7 +118,7 @@ export const typography = {
   },
   label: {
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "600",
   },
   helper: {
     fontSize: 12,
@@ -122,11 +126,11 @@ export const typography = {
   },
   button: {
     fontSize: 16,
-    fontWeight: "800",
+    fontWeight: "600",
   },
   buttonSmall: {
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "600",
   },
 } as const;
 
@@ -141,8 +145,7 @@ export const sizes = {
   recenterButtonHeight: 48,
   recenterButtonWidth: 132,
   recenterButtonCollapsedWidth: 56,
-  placeInfoImageHeight: 132,
-  placeInfoImageExpandedHeight: 220,
+  placeInfoImageHeight: 156,
   placeInfoSheetOffset: 430,
   lightBulbMarkerPadding: 22,
 } as const;
@@ -154,24 +157,18 @@ export const opacity = {
 
 export const shadows = {
   placeInfoCard: {
-    elevation: 8,
+    elevation: 0,
     shadowColor: colors.black,
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
-    shadowOffset: {
-      width: 0,
-      height: 5,
-    },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
   },
 
   recenterButton: {
-    elevation: 4,
+    elevation: 0,
     shadowColor: colors.black,
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
   },
 } as const;

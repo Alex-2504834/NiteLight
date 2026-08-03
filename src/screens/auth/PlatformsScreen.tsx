@@ -38,9 +38,13 @@ export default function PlatformsScreen({
         <Text style={[authStyles.backButtonText, { color: colour.textSecondary }]}>Back</Text>
       </TouchableOpacity>
 
-      <Text style={[authStyles.formTitle, { color: colour.text }]}>Continue with another platform</Text>
-
-      <Text style={[authStyles.formSubtitle, { color: colour.textSecondary }]}>Choose a provider to continue into NiteLight.</Text>
+      <View style={authStyles.formHeader}>
+        <Text style={[authStyles.formTitle, { color: colour.text }]}>Continue with another platform</Text>
+        <View
+          style={[authStyles.formRule, { backgroundColor: colour.primary }]}
+        />
+        <Text style={[authStyles.formSubtitle, { color: colour.textSecondary }]}>Choose a provider to continue into NiteLight.</Text>
+      </View>
 
       <ActionButton
         icon="logo-google"

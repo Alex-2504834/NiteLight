@@ -190,6 +190,10 @@ export default function SignUpScreen({
             {signUpStep === 1 ? "Create your account" : "Choose your profile"}
           </Text>
 
+          <View
+            style={[authStyles.formRule, { backgroundColor: colour.primary }]}
+          />
+
           <Text style={[authStyles.formSubtitle, { color: colour.textSecondary }]}>
             {signUpStep === 1
               ? "Add at least one contact method."
@@ -316,7 +320,12 @@ export default function SignUpScreen({
           style={authStyles.modalBackdrop}
           onPress={() => setCountryModalVisible(false)}
         >
-          <View style={[authStyles.countrySheet, { backgroundColor: colour.surface }]}>
+          <View
+            style={[
+              authStyles.countrySheet,
+              { backgroundColor: colour.surface, borderTopColor: colour.border },
+            ]}
+          >
             <Text style={[authStyles.countrySheetTitle, { color: colour.text }]}>Country code</Text>
 
             {countryCodes.map(country => (
